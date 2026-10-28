@@ -1,0 +1,79 @@
+<!doctype html><html lang="hi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MD Munna Rider V15 - Blinkit Style</title><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><style>*{box-sizing:border-box}body{margin:0;background:#f5f7f9;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial;color:#111827}.top{background:#111827;color:#fff;padding:16px;position:sticky;top:0}.top h1{margin:0;font-size:22px}.wrap{max-width:800px;margin:auto;padding:15px}.card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:16px;margin-bottom:14px}.field{margin:10px 0}input{width:100%;padding:12px;border:1px solid #d1d5db;border-radius:9px;font:inherit}button{border:0;border-radius:10px;padding:12px 15px;font-weight:800;cursor:pointer}.primary{background:#16a34a;color:#fff}.danger{background:#dc2626;color:#fff}.secondary{background:#e5e7eb}.status{padding:10px;border-radius:9px;background:#f3f4f6;margin:10px 0;font-weight:700}.ok{background:#dcfce7;color:#166534}.err{background:#fee2e2;color:#991b1b}.login{max-width:420px;margin:8vh auto}.hidden{display:none}.row{display:flex;gap:10px;flex-wrap:wrap}.row button{flex:1}.big{font-size:22px;font-weight:900}.order{border-top:1px solid #eee;padding:14px 0}.map{display:inline-block;margin-top:8px;color:#2563eb;font-weight:800;text-decoration:none}</style><meta name="theme-color" content="#111827"><link rel="manifest" href="manifest.webmanifest"><style>.product-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.product-grid input{min-width:0}.product-list{margin-top:12px}.product-item{border:1px solid #eee;border-radius:10px;padding:10px;margin:8px 0}.thumb{width:56px;height:56px;object-fit:cover;border-radius:8px;vertical-align:middle;margin-right:8px}@media(max-width:520px){.product-grid{grid-template-columns:1fr}}</style><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="apple-touch-icon" href="./icon-180.png"></head><body><div class="top"><h1>🚴 MD Munna Rider V15</h1></div><main class="wrap"><section id="login" class="card login"><h2>Rider Login</h2><div class="field"><input id="email" type="email" placeholder="Rider Email"></div><div class="field"><input id="password" type="password" placeholder="Password"></div><button id="loginBtn" class="primary" style="width:100%">Login</button><div id="loginMsg" class="status"></div></section><section id="app" class="hidden"><div class="card"><div class="big">📍 Rider Live Location</div><div id="locStatus" class="status">Location OFF</div><div class="row"><button id="startBtn" class="primary">📍 Start Location</button><button id="stopBtn" class="danger">⛔ Stop Location</button></div></div><div class="card" id="zinkitEarningsCard"><h2>💰 My Earnings</h2><div id="zinkitEarningsSummary" class="status">Loading...</div></div><div class="card"><h2>📦 My Orders</h2><div id="ordersMsg" class="status">Loading...</div><div id="orders"></div></div><div class="card"><h2>➕ Add Product</h2>
+<div class="product-grid">
+<input id="pName" placeholder="Product Name">
+<select id="pOption" style="width:100%;padding:12px;border:1px solid #d1d5db;border-radius:9px;font:inherit;background:#fff"><option value="">Select Option</option><option value="500g">500g</option><option value="1kg">1kg</option><option value="2kg">2kg</option></select>
+<input id="pPrice" type="number" min="0" step="0.01" placeholder="Price ₹">
+<input id="pImage" type="file" accept="image/*" title="Image 1 select karein (Photos / Files / Camera)">
+<input id="pImage2" type="file" accept="image/*" title="Image 2 select karein (Photos / Files / Camera)">
+</div>
+<button id="saveProductBtn" class="primary" style="width:100%;margin-top:10px">💾 Save Product</button>
+<div id="productMsg" class="status">Product management</div>
+<div id="productList" class="product-list"></div></div><button id="logoutBtn" class="secondary" style="width:100%">Logout</button></section></main><script>const SUPABASE_URL='https://fxwwvhfpmggvbnxwocls.supabase.co';const SUPABASE_KEY='sb_publishable_hGrj4EXH8sv8i36yrC89bg_KBjzvVUp';const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY); window.db=db;let watchId=null;let riderId=null; Object.defineProperty(window,'riderId',{get:()=>riderId});let activeOrderId=null;const $=id=>document.getElementById(id);function msg(id,text,ok=false){$(id).textContent=text;$(id).className='status '+(ok?'ok':'err')}async function login(){const email=$('email').value.trim(),password=$('password').value;if(!email||!password)return msg('loginMsg','Email aur password bharo.');const r=await db.auth.signInWithPassword({email,password});if(r.error)return msg('loginMsg',r.error.message);riderId=r.data.user.id; $('login').classList.add('hidden');$('app').classList.remove('hidden');msg('locStatus','Location OFF');loadOrders();startOrderRealtime();loadProducts()}async function startLocation(){if(!activeOrderId)return msg('locStatus','Pehle ek order par Start Delivery dabaiye.');if(!navigator.geolocation)return msg('locStatus','Is browser me GPS available nahi hai.');if(watchId!==null)return;msg('locStatus','📍 Location start ho rahi hai...');watchId=navigator.geolocation.watchPosition(async pos=>{const lat=pos.coords.latitude,lon=pos.coords.longitude;const {error}=await db.from('rider_locations').upsert({rider_id:riderId,latitude:lat,longitude:lon,updated_at:new Date().toISOString()},{onConflict:'rider_id'});if(error)msg('locStatus','Location save failed: '+error.message);else msg('locStatus','🟢 Live Location ON\n'+lat.toFixed(6)+', '+lon.toFixed(6),true)},err=>{msg('locStatus','GPS error: '+err.message);if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null}},{enableHighAccuracy:true,maximumAge:5000,timeout:15000})}function stopLocation(){if(watchId!==null)navigator.geolocation.clearWatch(watchId);watchId=null;msg('locStatus','Location OFF')}async function claimOrder(id){
+  const first=await db.from('orders').update({rider_id:riderId,status:'Out for Delivery'}).eq('id',id).is('rider_id',null);
+  if(first.error){
+    return msg('ordersMsg','Order assign failed: '+first.error.message+' — secure rider assignment ke liye orders.rider_id UUID column aur authenticated rider session zaroori hai.');
+  }else{
+    activeOrderId=id;
+    msg('ordersMsg','Order #'+id+' aapko assign ho gaya. Ab Start Location dabaiye.',true);
+  }
+  loadOrders();
+  startLocation();
+}
+async function setStatus(id,status){
+  const q=await db.from('orders').update({status}).eq('id',id).eq('rider_id',riderId);
+  if(q.error)return msg('ordersMsg','Status update failed: '+q.error.message);
+  if(status==='Delivered'||status==='Cancelled'||status==='Canceled') activeOrderId=null;
+  msg('ordersMsg','Order #'+id+' status: '+status,true); loadOrders();
+}
+function startOrderRealtime(){try{db.channel('rider-orders-live').on('postgres_changes',{event:'*',schema:'public',table:'orders'},()=>loadOrders()).subscribe()}catch(e){}}async function loadOrders(){
+  const r=await db.from('orders').select('*').order('created_at',{ascending:false});
+  if(r.error)return msg('ordersMsg','Orders load failed: '+r.error.message);
+  $('ordersMsg').textContent=r.data.length?'Orders loaded':'Abhi koi order nahi hai.';
+  $('ordersMsg').className='status '+(r.data.length?'ok':'');
+  $('orders').innerHTML=r.data.map(o=>{
+    let items=Array.isArray(o.items)?o.items.map(x=>`${x.name||x.Product||'Product'} × ${x.qty||x.quantity||1}`).join(', '):String(o.items||'');
+    let hasLoc=o.latitude!=null&&o.longitude!=null;
+    let map=hasLoc?`<a class="map" target="_blank" href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(o.latitude+','+o.longitude)}">🗺️ Customer Location / Navigate</a>`:`<div class="status err">📍 Customer GPS location is not saved. Customer App me Location Allow karke order place karein.</div>`;
+    const done=['Delivered','Cancelled','Canceled','Order Cancelled'].includes(String(o.status||''));
+    const claim=!o.rider_id&&!done?`<button class="primary" style="margin-top:8px;width:100%" onclick='claimOrder(${JSON.stringify(o.id)})'>🚴 Take Order & Start Delivery</button>`:(o.rider_id===riderId||activeOrderId===o.id)?`<div class="status ok">🚴 This order is active for you</div>`:'';
+    const actions=(o.rider_id===riderId||activeOrderId===o.id)?`<div class="row" style="margin-top:8px">
+      <button class="primary" onclick='setStatus(${JSON.stringify(o.id)},"Out for Delivery")'>🚚 Out for Delivery</button>
+      <button class="primary" onclick='setStatus(${JSON.stringify(o.id)},"Delivered")'>✅ Delivered</button>
+      <button class="danger" onclick='setStatus(${JSON.stringify(o.id)},"Cancelled")'>❌ Cancel</button>
+    </div>`:'';
+    return `<div class="order"><b>Order #${o.id}</b><br>📌 Status: ${o.status||''}<br>👤 ${o.customer_name||''}<br>📞 ${o.mobile||''}<br>📍 ${o.address||''}<br>🛒 ${items}<br>💰 ₹${o.total||0}<br>${map}${claim}${actions}</div>`;
+  }).join('');
+}
+async function saveProduct(){
+  const name=$('pName').value.trim(), option=$('pOption').value.trim(), price=Number($('pPrice').value);
+  if(!name||!option||!Number.isFinite(price)) return msg('productMsg','Product name, option aur valid price bharo.');
+  async function fileToDataURL(file){
+    if(!file)return null;
+    return await new Promise((resolve,reject)=>{
+      const fr=new FileReader();
+      fr.onload=()=>resolve(fr.result);
+      fr.onerror=reject;
+      fr.readAsDataURL(file);
+    });
+  }
+  const image1=await fileToDataURL($('pImage').files[0]);
+  const image2=await fileToDataURL($('pImage2').files[0]);
+  const payload={Products:option ? `${name} (${option})` : name,Price:price,Image1:image1,Image2:image2,Image3:null};
+  const r=await db.from('Products').insert(payload).select();
+  if(r.error)return msg('productMsg','Product save failed: '+r.error.message);
+  ['pName','pOption','pPrice','pImage','pImage2'].forEach(id=>$(id).value='');
+  msg('productMsg','✅ Product save ho gaya: '+name+' — '+option,true); loadProducts();
+}
+async function loadProducts(){
+  const r=await db.from('Products').select('*').limit(30);
+  if(r.error){$('productList').innerHTML='<div class="status err">Products load failed: '+r.error.message+'</div>';return}
+  $('productList').innerHTML=r.data.map(p=>`<div class="product-item">${p.Image1?`<img class="thumb" src="${String(p.Image1).replace(/"/g,'&quot;')}" onerror="this.style.display='none'">`:''}<b>${p.Products||p.name||'Product'}</b>${p.Option||p.option?` — ${p.Option||p.option}`:''} — ₹${p.Price||p.price||0}${p.Image2?`<br>🖼️ Image 2 added`:''}</div>`).join('')||'<div class="status">No products yet.</div>';
+}
+async function logout(){stopLocation();await db.auth.signOut();$('app').classList.add('hidden');$('login').classList.remove('hidden');$('password').value=''}$('loginBtn').onclick=login;$('startBtn').onclick=startLocation;$('stopBtn').onclick=stopLocation;$('logoutBtn').onclick=logout;$('saveProductBtn').onclick=saveProduct;$('password').addEventListener('keydown',e=>{if(e.key==='Enter')login()});db.auth.getSession().then(({data})=>{if(data.session){riderId=data.session.user.id;$('login').classList.add('hidden');$('app').classList.remove('hidden');loadOrders();loadProducts()}});if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(()=>{});} </script>
+<script id="zinkit-rider-earnings-connected">
+(function(){
+  window.zinkitLoadEarnings=async function(){const el=document.getElementById('zinkitEarningsSummary');if(!el||!window.db||!window.riderId)return;try{const r=await window.db.from('orders').select('id,status,total,created_at').eq('rider_id',window.riderId).order('created_at',{ascending:false}).limit(1000);if(r.error)throw r.error;const delivered=(r.data||[]).filter(o=>String(o.status||'').toLowerCase()==='delivered');const total=delivered.reduce((s,o)=>s+Math.max(0,Number(o.total||0))*0.10,0);el.textContent='₹'+total.toFixed(2)+' earned • '+delivered.length+' delivered orders';el.className='status ok'}catch(e){el.textContent='Earnings load failed: '+(e.message||e);el.className='status err'}};
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(window.zinkitLoadEarnings,700));
+})();
+</script>
+<script>if("serviceWorker" in navigator){window.addEventListener("load",async()=>{try{const reg=await navigator.serviceWorker.register("./sw.js?v=zinkit-rider-pwa-icons-v1");if(reg.waiting)reg.waiting.postMessage({type:"SKIP_WAITING"});reg.addEventListener("updatefound",()=>{const nw=reg.installing;if(!nw)return;nw.addEventListener("statechange",()=>{if(nw.state==="installed"&&navigator.serviceWorker.controller)nw.postMessage({type:"SKIP_WAITING"})})});let reloaded=false;navigator.serviceWorker.addEventListener("controllerchange",()=>{if(!reloaded){reloaded=true;window.location.reload()}})}catch(e){console.warn("PWA update check failed",e)}})}</script></body></html>
